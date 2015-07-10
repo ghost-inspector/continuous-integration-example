@@ -4,14 +4,15 @@ test:
         - node server.js:
             background: true
         # Download ngrok and open tunnel to our application
-        - wget https://dl.ngrok.com/ngrok_2.0.17_linux_amd64.zip
-        - unzip ngrok_2.0.17_linux_amd64.zip
+        - wget https://dl.ngrok.com/ngrok_2.0.19_linux_amd64.zip
+        - unzip ngrok_2.0.19_linux_amd64.zip
         - ./ngrok authtoken $NGROK_TOKEN
-        - ./ngrok http -subdomain=$CIRCLE_SHA1 3000:
+        - ./ngrok http 3000:
             background: true
-        # Wait for application and ngrok to be ready
-        - curl --retry 10 --retry-delay 2 -v https://$CIRCLE_SHA1.ngrok.io
+        # Download json parser for determining ngrok tunnel
+        - wget http://stedolan.github.io/jq/download/linux64/jq
+        - chmod +x jq
         # Execute Ghost Inspector tests using the ngrok tunnel
-        - curl "https://api.ghostinspector.com/v1/suites/$GHOST_SUITE_ID/execute/?apiKey=$GHOST_API_KEY&startUrl=https://$CIRCLE_SHA1.ngrok.io" > ghostinspector.json
+        - curl "https://api.ghostinspector.com/v1/suites/$GHOST_SUITE_ID/execute/?apiKey=$GHOST_API_KEY&startUrl=$(curl 'http://localhost:4040/api/tunnels' | ./jq -r '.tunnels[1].public_url')" > ghostinspector.json
         # Exit with a fail status if any tests have failed
         - if [ $(grep -c '"passing":false' ghostinspector.json) -ne 0 ]; then exit 1; fi
