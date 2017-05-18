@@ -1,0 +1,28 @@
+language: node_js
+sudo: false
+node_js:
+  - "4"
+env:
+- GHOST_API_KEY=xxx GHOST_SUITE_ID=xxx NGROK_TOKEN=xxx
+install:
+  # Download ngrok
+  - curl -sO https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
+  - unzip $PWD/ngrok-stable-linux-amd64.zip
+  - chmod +x $PWD/ngrok
+  # Download json parser for determining ngrok tunnel
+  - curl -sO https://stedolan.github.io/jq/download/linux64/jq
+  - chmod +x $PWD/jq
+script:
+  # Start our application
+  - node server.js &
+  - sleep 3
+  # Open ngrok tunnel
+  - curl http://127.0.0.1:3000
+  - $PWD/ngrok authtoken $NGROK_TOKEN
+  - $PWD/ngrok http 3000 > /dev/null &
+  - sleep 3
+  # Execute Ghost Inspector tests using the ngrok tunnel
+  - curl http://127.0.0.1:4040/api/tunnels
+  - curl "https://api.ghostinspector.com/v1/suites/$GHOST_SUITE_ID/execute/?apiKey=$GHOST_API_KEY&startUrl=$(curl 'http://localhost:4040/api/tunnels' | $PWD/jq -r '.tunnels[1].public_url')" > $PWD/ghostinspector.json
+  # Exit with a fail status if any tests have failed
+  - if [ $(grep -c '"passing":false' $PWD/ghostinspector.json) -ne 0 ]; then exit 1; fi
